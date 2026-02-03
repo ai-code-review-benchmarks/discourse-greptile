@@ -33,7 +33,7 @@ class AssetProcessor
   end
 
   def self.snapshot
-    @snapshot ||=
+    @raw_snapshot ||=
       begin
         source =
           if Rails.env.production?
@@ -42,8 +42,10 @@ class AssetProcessor
             build_asset_processor
           end
 
-        MiniRacer::Snapshot.new(source)
+        MiniRacer::Snapshot.new(source).dump
       end
+
+    MiniRacer::Snapshot.load(@raw_snapshot)
   end
 
   def self.create_new_context
