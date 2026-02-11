@@ -3633,6 +3633,7 @@ en:
         dismiss_tooltip: "Dismiss just new posts or stop tracking topics"
         also_dismiss_topics: "Stop tracking these topics so they never show up as unread for me again"
         dismiss_new: "Dismiss New"
+        dismiss_new_tooltip: "Dismiss new topics or stop tracking them"
         dismiss_new_modal:
           title: "Dismiss new"
           topics: "Dismiss new topics"
