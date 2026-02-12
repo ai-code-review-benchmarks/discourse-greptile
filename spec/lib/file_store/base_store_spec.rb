@@ -189,16 +189,16 @@ RSpec.describe FileStore::BaseStore do
       # Net::HTTP always returns binary ASCII-8BIT encoding. File.read auto-detects the encoding
       # Make sure we File.read after downloading a file for consistency
 
-      first_encoding = store.download(upload_s3, print_deprecation: false).read.encoding
+      first_encoding = store.download(upload_s3).read.encoding
 
-      second_encoding = store.download(upload_s3, print_deprecation: false).read.encoding
+      second_encoding = store.download(upload_s3).read.encoding
 
       expect(first_encoding).to eq(Encoding::UTF_8)
       expect(second_encoding).to eq(Encoding::UTF_8)
     end
 
     it "should return the file" do
-      file = store.download(upload_s3, print_deprecation: false)
+      file = store.download(upload_s3)
 
       expect(file.class).to eq(File)
     end
@@ -210,7 +210,7 @@ RSpec.describe FileStore::BaseStore do
         body: "Hello world",
       )
 
-      file = store.download(upload_s3, print_deprecation: true)
+      file = store.download(upload_s3)
 
       expect(file.class).to eq(File)
     end
@@ -223,9 +223,53 @@ RSpec.describe FileStore::BaseStore do
       signed_url = Discourse.store.signed_url_for_path(upload_s3.url)
       stub_request(:get, signed_url).to_return(status: 200, body: "Hello world")
 
-      file = store.download(upload_s3, print_deprecation: false)
+      file = store.download(upload_s3)
 
       expect(file.class).to eq(File)
+    end
+
+    it "returns nil when download fails" do
+      FileHelper.stubs(:download).raises(OpenURI::HTTPError.new("400 error", anything))
+
+      expect(store.download(upload_s3)).to eq(nil)
+    end
+
+    it "yields the file and returns the block result when given a block" do
+      result =
+        store.download(upload_s3) do |file|
+          expect(file).to be_a(File)
+          :block_result
+        end
+
+      expect(result).to eq(:block_result)
+    end
+
+    it "ensures the file is closed after the block" do
+      file_ref = nil
+
+      store.download(upload_s3) do |file|
+        file_ref = file
+        expect(file_ref).not_to be_closed
+      end
+
+      expect(file_ref).to be_closed
+    end
+
+    it "returns nil when download fails with a block" do
+      FileHelper.stubs(:download).raises(OpenURI::HTTPError.new("400 error", anything))
+      block_called = false
+
+      result = store.download(upload_s3) { |_f| block_called = true }
+
+      expect(result).to be_nil
+      expect(block_called).to eq(false)
+    end
+
+    it "propagates block exceptions" do
+      expect { store.download(upload_s3) { raise ArgumentError, "test" } }.to raise_error(
+        ArgumentError,
+        "test",
+      )
     end
   end
 
@@ -238,26 +282,39 @@ RSpec.describe FileStore::BaseStore do
     let(:upload_s3) { Fabricate(:upload_s3) }
     let(:store) { FileStore::BaseStore.new }
 
-    it "does not raise an error when download fails" do
+    it "raises DownloadError when download fails" do
       FileHelper.stubs(:download).raises(OpenURI::HTTPError.new("400 error", anything))
 
       expect { store.download!(upload_s3) }.to raise_error(FileStore::DownloadError)
     end
-  end
 
-  describe "#download_safe" do
-    before do
-      setup_s3
-      stub_request(:get, upload_s3.url).to_return(status: 200, body: "Hello world")
-    end
-
-    let(:upload_s3) { Fabricate(:upload_s3) }
-    let(:store) { FileStore::BaseStore.new }
-
-    it "does not raise an error when download fails" do
+    it "raises DownloadError when download fails with a block" do
       FileHelper.stubs(:download).raises(OpenURI::HTTPError.new("400 error", anything))
 
-      expect(store.download_safe(upload_s3)).to eq(nil)
+      expect { store.download!(upload_s3) { |_f| :should_not_reach } }.to raise_error(
+        FileStore::DownloadError,
+      )
+    end
+
+    it "yields the file and ensures it is closed with a block" do
+      file_ref = nil
+
+      result =
+        store.download!(upload_s3) do |file|
+          file_ref = file
+          expect(file).to be_a(File)
+          :block_result
+        end
+
+      expect(result).to eq(:block_result)
+      expect(file_ref).to be_closed
+    end
+
+    it "propagates block exceptions" do
+      expect { store.download!(upload_s3) { raise ArgumentError, "test" } }.to raise_error(
+        ArgumentError,
+        "test",
+      )
     end
   end
 end

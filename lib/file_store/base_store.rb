@@ -91,61 +91,35 @@ module FileStore
       not_implemented
     end
 
-    # TODO: Remove when #download becomes the canonical safe version.
-    def download_safe(*, **)
-      download(*, **, print_deprecation: false)
-    rescue StandardError
-      nil
-    end
-
-    def download!(*, **)
-      download(*, **, print_deprecation: false)
-    rescue StandardError
-      raise DownloadError
-    end
-
-    def download(object, max_file_size_kb: nil, print_deprecation: true)
-      DistributedMutex.synchronize("download_#{object.sha1}", validity: 3.minutes) do
-        extension =
-          File.extname(
-            object.respond_to?(:original_filename) ? object.original_filename : object.url,
-          )
-        filename = "#{object.sha1}#{extension}"
-        file = get_from_cache(filename)
-
-        if !file
-          max_file_size_kb ||= [
-            SiteSetting.max_image_size_kb,
-            SiteSetting.max_attachment_size_kb,
-          ].max.kilobytes
-
-          secure = object.respond_to?(:secure) ? object.secure? : object.upload.secure?
-          url =
-            (
-              if secure
-                Discourse.store.signed_url_for_path(object.url)
-              else
-                Discourse.store.cdn_url(object.url)
-              end
-            )
-
-          url = SiteSetting.scheme + ":" + url if url =~ %r{\A//}
-          file =
-            FileHelper.download(
-              url,
-              max_file_size: max_file_size_kb,
-              tmp_file_name: "discourse-download",
-              follow_redirect: true,
-            )
-
-          return nil if file.nil?
-
-          cache_file(file, filename)
-          file = get_from_cache(filename)
+    def download(*, **, &block)
+      file =
+        begin
+          perform_download(*, **)
+        rescue StandardError
+          nil
         end
 
-        file
-      end
+      block ? yield_file(file, &block) : file
+    end
+
+    def download_safe(*, **, &block)
+      Discourse.deprecate(
+        "`FileStore::BaseStore#download_safe` is deprecated. Use `#download` instead.",
+        since: "3.5.0.beta1",
+        drop_from: "3.6.0.beta1",
+      )
+      download(*, **, &block)
+    end
+
+    def download!(*, **, &block)
+      file =
+        begin
+          perform_download(*, **)
+        rescue StandardError
+          raise DownloadError
+        end
+
+      block ? yield_file(file, &block) : file
     end
 
     def purge_tombstone(grace_period)
@@ -222,6 +196,50 @@ module FileStore
     end
 
     private
+
+    def yield_file(file)
+      return unless file
+      yield file
+    ensure
+      file&.close
+    end
+
+    def perform_download(object, max_file_size_kb: nil)
+      DistributedMutex.synchronize("download_#{object.sha1}", validity: 3.minutes) do
+        name = object.respond_to?(:original_filename) ? object.original_filename : object.url
+        extension = File.extname(name)
+        filename = "#{object.sha1}#{extension}"
+
+        unless File.exist?(get_cache_path_for(filename))
+          max_file_size_kb ||= [
+            SiteSetting.max_image_size_kb,
+            SiteSetting.max_attachment_size_kb,
+          ].max.kilobytes
+
+          if object.respond_to?(:secure) ? object.secure? : object.upload.secure?
+            url = Discourse.store.signed_url_for_path(object.url)
+          else
+            url = Discourse.store.cdn_url(object.url)
+          end
+
+          url = "#{SiteSetting.scheme}:#{url}" if url =~ %r{\A//}
+
+          file =
+            FileHelper.download(
+              url,
+              max_file_size: max_file_size_kb,
+              tmp_file_name: "discourse-download",
+              follow_redirect: true,
+            )
+
+          return if file.nil?
+
+          cache_file(file, filename)
+        end
+
+        get_from_cache(filename)
+      end
+    end
 
     def not_implemented
       raise "Not implemented."

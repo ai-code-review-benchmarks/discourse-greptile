@@ -232,7 +232,7 @@ class StaticController < ApplicationController
         Discourse
           .cache
           .fetch("llms_txt_content:#{upload.sha1}") do
-            Discourse.store.download_safe(upload)&.path&.then { |path| File.read(path) }
+            Discourse.store.download(upload) { |file| file.read }
           end
       return head(:not_found) if content.blank?
 

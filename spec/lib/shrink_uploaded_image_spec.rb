@@ -147,7 +147,7 @@ RSpec.describe ShrinkUploadedImage do
       result =
         ShrinkUploadedImage.new(
           upload: upload,
-          path: Discourse.store.download(upload).path,
+          path: Discourse.store.download(upload) { |f| f.path },
           max_pixels: 10_000,
         ).perform
 

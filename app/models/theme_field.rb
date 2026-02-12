@@ -279,8 +279,7 @@ class ThemeField < ActiveRecord::Base
       end
 
     if Discourse.store.external?
-      external_copy = Discourse.store.download_safe(upload)
-      path = external_copy&.path
+      path = Discourse.store.download(upload) { |f| f.path }
     else
       path = Discourse.store.path_for(upload)
     end
