@@ -10,12 +10,15 @@ const sandboxDisabled =
     (process.env.DISCOURSE_DISABLE_BROWSER_SANDBOX || "").toLowerCase()
   );
 
+console.log("Running testem.js ");
+
 class Reporter extends TapReporter {
   failReports = [];
   deprecationCounts = new Map();
   deprecationCountsByOrigin = new Map();
 
   constructor() {
+    console.log("Reporter initialized");
     super(...arguments);
 
     // Colors are enabled automatically in dev env, just need to toggle them on in GH
