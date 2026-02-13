@@ -253,7 +253,8 @@ class QunitRunner
     if @qunit_path
       run_theme_build(unless_build_reused: reuse_build)
       env["THEME_TEST_PAGES"] = build_theme_test_pages(query)
-      args += %w[pnpm testem ci -f testem.js]
+      puts "Launching testem"
+      args += %w[pnpm testem ci -f testem.js -d]
       args += ["--parallel", parallel.to_s] if parallel
     else
       args = %w[pnpm ember exam]
