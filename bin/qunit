@@ -450,6 +450,8 @@ class QunitRunner
       server_ready =
         begin
           res = Net::HTTP.get_response(uri)
+          puts "? Rails server responded with #{res.code}"
+          puts "? Response body: #{res.body}"
           res.is_a?(Net::HTTPSuccess)
         rescue Errno::ECONNREFUSED,
                Errno::EADDRNOTAVAIL,
