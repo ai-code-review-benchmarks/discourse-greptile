@@ -3,7 +3,7 @@
 
 if ENV["RUN_PITCHFORK"] != "0"
   STDERR.puts "[bin/unicorn] Running bin/pitchfork. Use RUN_PITCHFORK=0 to run unicorn instead."
-  exec File.expand_path("pitchfork", __dir__)
+  exec File.expand_path("pitchfork", __dir__), *ARGV
 end
 
 require "pathname"
