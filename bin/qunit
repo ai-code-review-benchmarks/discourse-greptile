@@ -464,6 +464,8 @@ class QunitRunner
       exit 1
     end
 
+    puts "Sleeping 10 more seconds for good luck"
+    sleep 10
     puts "Rails server is warmed up"
   end
 
