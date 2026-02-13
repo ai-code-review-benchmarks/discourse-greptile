@@ -446,23 +446,30 @@ class QunitRunner
     puts "Warming up Rails server"
 
     deadline = Time.now + 60
-    begin
-      Net::HTTP.get(uri)
-    rescue Errno::ECONNREFUSED,
-           Errno::EADDRNOTAVAIL,
-           Net::ReadTimeout,
-           Net::HTTPBadResponse,
-           EOFError
-      if Time.now <= deadline
-        sleep 1
-        retry
+    loop do
+      server_ready =
+        begin
+          res = Net::HTTP.get_response(uri)
+          res.is_a?(Net::HTTPSuccess)
+        rescue Errno::ECONNREFUSED,
+               Errno::EADDRNOTAVAIL,
+               Net::ReadTimeout,
+               Net::HTTPBadResponse,
+               EOFError
+          false
+        end
+
+      if server_ready
+        puts "Rails server is warmed up"
+        return
+      else
+        if Time.now > deadline
+          puts "Timed out waiting for Rails server to warm up"
+          exit 1
+        end
       end
-
-      puts "Timed out. Cannot connect to forked server!"
-      exit 1
+      sleep 1
     end
-
-    puts "Rails server is warmed up"
   end
 
   def run_theme_build(unless_build_reused: false)
