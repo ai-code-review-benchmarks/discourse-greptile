@@ -448,7 +448,8 @@ class QunitRunner
 
     deadline = Time.now + 60
     begin
-      Net::HTTP.get(uri)
+      res = Net::HTTP.get_response(uri)
+      puts "HTTP #{res.code}"
     rescue Errno::ECONNREFUSED,
            Errno::EADDRNOTAVAIL,
            Net::ReadTimeout,
